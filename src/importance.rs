@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use structopt::StructOpt;
 
+pub type Importances = BTreeMap<StudyId, Vec<Importance>>;
+
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all = "kebab-case")]
 pub struct ImportanceOpt {
@@ -160,7 +162,7 @@ pub struct Importance {
     pub importance: MeanAndStddev,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct MeanAndStddev {
     pub mean: f64,
     pub stddev: f64,

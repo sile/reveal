@@ -4,6 +4,7 @@ use structopt::StructOpt;
 #[structopt(rename_all = "kebab-case")]
 enum Opt {
     Importance(reveal::importance::ImportanceOpt),
+    Plot(reveal::plot::PlotOpt),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -15,6 +16,9 @@ fn main() -> anyhow::Result<()> {
             let importances = opt.calculate_importances(&records)?;
             serde_json::to_writer(std::io::stdout().lock(), &importances)?;
             println!();
+        }
+        Opt::Plot(opt) => {
+            opt.plot(std::io::stdin().lock())?;
         }
     }
     Ok(())

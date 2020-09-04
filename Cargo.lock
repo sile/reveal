@@ -195,8 +195,6 @@ dependencies = [
 [[package]]
 name = "hporecord"
 version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f917651267616df469b442cf53cb4d0a0c6fc0f942bb1270ce3cacf86f9707b1"
 dependencies = [
  "serde",
 ]

@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1"
 fanova = "0.1"
-hporecord = "0.0.1"
+hporecord = { path = "../hporecord/" } #"0.0.1"
 indicatif = "0.15"
 itertools = "0.9"
 ordered-float = "2"
