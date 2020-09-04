@@ -12,9 +12,9 @@ fn main() -> anyhow::Result<()> {
         Opt::Importance(opt) => {
             let records = reveal::io::read_records(std::io::stdin().lock())
                 .collect::<anyhow::Result<Vec<_>>>()?;
-            println!("# LEN: {}", records.len());
-            //
-            todo!()
+            let importances = opt.calculate_importances(&records)?;
+            serde_json::to_writer(std::io::stdout().lock(), &importances)?;
+            println!();
         }
     }
     Ok(())
