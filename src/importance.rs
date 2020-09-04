@@ -1,5 +1,6 @@
 use anyhow::ensure;
-use hporecord::{EvalState, Record, StudyId, StudyRecord};
+use hporecord::{EvalState, ParamDef, Record, StudyId, StudyRecord};
+//use indicatif::ProgressBar;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
@@ -15,6 +16,9 @@ pub struct ImportanceOpt {
 
     #[structopt(long, default_value = "1")]
     pub max_dimension: NonZeroUsize,
+
+    #[structopt(long)]
+    pub convert_log_param: bool,
 
     #[structopt(long)]
     pub key_script: Option<String>,
@@ -37,12 +41,12 @@ impl ImportanceOpt {
             )?;
 
             for dim in 1..=self.max_dimension.get() {
-                for indices in (0..study.param_names.len()).combinations(dim) {
+                for indices in (0..study.param_defs.len()).combinations(dim) {
                     let importance = fanova.quantify_importance(&indices);
                     importances.push(Importance {
                         params: indices
                             .into_iter()
-                            .map(|i| study.param_names[i].clone())
+                            .map(|i| study.param_defs[i].name.clone())
                             .collect(),
                         importance: MeanAndStddev {
                             mean: importance.mean,
@@ -103,8 +107,21 @@ impl ImportanceOpt {
                     }
 
                     let study = studies.get_mut(study_id).expect("unreachable");
-                    for (&p, ps) in eval.params.iter().zip(study.params.iter_mut()) {
-                        ps.push(p);
+                    for ((&p, ps), def) in eval
+                        .params
+                        .iter()
+                        .zip(study.params.iter_mut())
+                        .zip(study.param_defs.iter())
+                    {
+                        use hporecord::{ParamRange, Scale};
+
+                        if self.convert_log_param
+                            && matches!(def.range, ParamRange::Numerical{scale: Scale::Log,..})
+                        {
+                            ps.push(p.ln());
+                        } else {
+                            ps.push(p);
+                        }
                     }
                     ensure!(
                         self.objective_value_index < eval.values.len(),
@@ -122,7 +139,7 @@ impl ImportanceOpt {
 
 #[derive(Debug)]
 pub struct Study {
-    param_names: Vec<String>,
+    param_defs: Vec<ParamDef>,
     params: Vec<Vec<f64>>,
     values: Vec<f64>,
 }
@@ -130,7 +147,7 @@ pub struct Study {
 impl Study {
     fn new(record: &StudyRecord) -> Self {
         Self {
-            param_names: record.params.iter().map(|p| p.name.clone()).collect(),
+            param_defs: record.params.clone(),
             params: vec![Vec::new(); record.params.len()],
             values: Vec::new(),
         }
