@@ -15,6 +15,9 @@ pub struct ImportanceOpt {
 
     #[structopt(long, default_value = "1")]
     pub max_dimension: NonZeroUsize,
+
+    #[structopt(long)]
+    pub key_script: Option<String>,
 }
 
 impl ImportanceOpt {
@@ -57,18 +60,41 @@ impl ImportanceOpt {
     }
 
     fn build_studies(&self, records: &[Record]) -> anyhow::Result<BTreeMap<StudyId, Study>> {
+        let mut id_mapping = BTreeMap::new();
+        if let Some(script) = &self.key_script {
+            for record in records {
+                if let Record::Study(study) = record {
+                    let lua = rlua::Lua::new();
+                    let new_id: String = lua.context(|lua_ctx| {
+                        let globals = lua_ctx.globals();
+
+                        // TODO
+                        globals.set("attrs", study.attrs.clone())?;
+
+                        lua_ctx.load(&script).eval()
+                    })?;
+                    id_mapping.insert(&study.id, new_id);
+                }
+            }
+        }
+
         // TODO: Handle categorical and log scale
         let mut studies = BTreeMap::new();
         for record in records {
             match record {
                 Record::Study(study) => {
-                    if !studies.contains_key(&study.id) {
-                        studies.insert(study.id.clone(), Study::new(study));
+                    let study_id = id_mapping.get(&study.id).unwrap_or(&study.id);
+                    if !studies.contains_key(study_id) {
+                        studies.insert(study_id.clone(), Study::new(study));
+                    } else {
+                        // TODO: Check whether the parameter definitions of the both studies are the same.
                     }
                 }
                 Record::Eval(eval) => {
+                    let study_id = id_mapping.get(&eval.study).unwrap_or(&eval.study);
+
                     ensure!(
-                        studies.contains_key(&eval.study),
+                        studies.contains_key(study_id),
                         "unknown study {:?}",
                         eval.study
                     );
@@ -76,7 +102,7 @@ impl ImportanceOpt {
                         continue;
                     }
 
-                    let study = studies.get_mut(&eval.study).expect("unreachable");
+                    let study = studies.get_mut(study_id).expect("unreachable");
                     for (&p, ps) in eval.params.iter().zip(study.params.iter_mut()) {
                         ps.push(p);
                     }
