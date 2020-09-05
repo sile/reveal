@@ -4,6 +4,9 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 
+pub type LuaScript = String;
+pub type Studies = BTreeMap<String, BTreeMap<String, Study>>;
+
 #[derive(Debug, StructOpt)]
 pub struct CurveOpt {
     #[structopt(long, default_value = "0")]
@@ -12,52 +15,60 @@ pub struct CurveOpt {
     #[structopt(long, default_value = "0")]
     pub objective_index: usize,
 
-    // TODO:
     #[structopt(long)]
-    pub problem_name: Option<String>,
+    pub problem_name: LuaScript,
 
     #[structopt(long)]
-    pub optimizer_name: Option<String>,
-
-    #[structopt(long)]
-    pub key_script: Option<String>,
+    pub optimizer_name: LuaScript,
 }
 
 impl CurveOpt {
-    pub fn calculate_optimization_curve(
-        &self,
-        records: &[Record],
-    ) -> anyhow::Result<BTreeMap<String, Study>> {
+    pub fn calculate_optimization_curve(&self, records: &[Record]) -> anyhow::Result<Studies> {
         let studies = self.build_studies(records)?;
         Ok(studies)
     }
 
-    fn build_studies(&self, records: &[Record]) -> anyhow::Result<BTreeMap<String, Study>> {
-        let mut id_mapping = BTreeMap::new();
-        if let Some(script) = &self.key_script {
-            for record in records {
-                if let Record::Study(study) = record {
-                    let lua = rlua::Lua::new();
-                    let new_id: String = lua.context(|lua_ctx| {
-                        let globals = lua_ctx.globals();
+    fn build_studies(&self, records: &[Record]) -> anyhow::Result<Studies> {
+        let mut problem_mapping = BTreeMap::new();
+        let mut optimizer_mapping = BTreeMap::new();
+        for record in records {
+            if let Record::Study(study) = record {
+                let lua = rlua::Lua::new();
+                let new_id: String = lua.context(|lua_ctx| {
+                    let globals = lua_ctx.globals();
 
-                        // TODO
-                        globals.set("attrs", study.attrs.clone())?;
+                    // TODO
+                    globals.set("attrs", study.attrs.clone())?;
 
-                        lua_ctx.load(&script).eval()
-                    })?;
-                    id_mapping.insert(&study.id, new_id);
-                }
+                    lua_ctx.load(&self.problem_name).eval()
+                })?;
+                problem_mapping.insert(&study.id, new_id);
+            }
+
+            if let Record::Study(study) = record {
+                let lua = rlua::Lua::new();
+                let new_id: String = lua.context(|lua_ctx| {
+                    let globals = lua_ctx.globals();
+
+                    // TODO
+                    globals.set("attrs", study.attrs.clone())?;
+
+                    lua_ctx.load(&self.optimizer_name).eval()
+                })?;
+                optimizer_mapping.insert(&study.id, new_id);
             }
         }
 
-        let mut studies = BTreeMap::new();
+        let mut studies: Studies = BTreeMap::new();
         for record in records {
             match record {
                 Record::Study(study) => {
-                    let study_id = id_mapping.get(&study.id).unwrap_or(&study.id);
+                    let problem_id = problem_mapping.get(&study.id).expect("unreachable");
+                    let optimizer_id = optimizer_mapping.get(&study.id).expect("unreachable");
                     studies
-                        .entry(study_id.clone())
+                        .entry(problem_id.clone())
+                        .or_default()
+                        .entry(optimizer_id.clone())
                         .or_insert_with(|| Study {
                             span_name: study.spans[self.span_index].name.clone(),
                             objective: study.values[self.objective_index].clone(),
@@ -74,9 +85,14 @@ impl CurveOpt {
                     if !eval.state.is_complete() {
                         continue;
                     }
+                    let problem_id = problem_mapping.get(&eval.study).expect("TODO");
+                    let optimizer_id = optimizer_mapping.get(&eval.study).expect("TODO");
 
-                    let study_id = id_mapping.get(&eval.study).unwrap_or(&eval.study);
-                    let study = studies.get_mut(study_id).expect("TODO");
+                    let study = studies
+                        .get_mut(problem_id)
+                        .expect("unreachable")
+                        .get_mut(optimizer_id)
+                        .expect("unreachable");
                     let best_values = study.best_values.get_mut(&eval.study).expect("TODO");
 
                     let span = eval.spans[self.span_index];
@@ -101,35 +117,37 @@ impl CurveOpt {
             }
         }
 
-        for study in studies.values_mut() {
-            let size = study
-                .best_values
-                .values()
-                .map(|vs| vs.len())
-                .max()
-                .expect("unreachable");
-            for i in 0..size {
-                if study.best_values.values().any(|vs| vs[i].is_none()) {
-                    study.best_values_avg.mean.push(None);
-                    study.best_values_avg.stddev.push(None);
-                    continue;
-                }
+        for studies in studies.values_mut() {
+            for study in studies.values_mut() {
+                let size = study
+                    .best_values
+                    .values()
+                    .map(|vs| vs.len())
+                    .max()
+                    .expect("unreachable");
+                for i in 0..size {
+                    if study.best_values.values().any(|vs| vs[i].is_none()) {
+                        study.best_values_avg.mean.push(None);
+                        study.best_values_avg.stddev.push(None);
+                        continue;
+                    }
 
-                let total = study
-                    .best_values
-                    .values()
-                    .map(|vs| vs[i].expect("unreachable"))
-                    .sum::<f64>();
-                let mean = total / study.best_values.len() as f64;
-                let stddev = (study
-                    .best_values
-                    .values()
-                    .map(|vs| (vs[i].expect("unreachable") - mean).powi(2))
-                    .sum::<f64>()
-                    / study.best_values.len() as f64)
-                    .sqrt();
-                study.best_values_avg.mean.push(Some(mean));
-                study.best_values_avg.stddev.push(Some(stddev));
+                    let total = study
+                        .best_values
+                        .values()
+                        .map(|vs| vs[i].expect("unreachable"))
+                        .sum::<f64>();
+                    let mean = total / study.best_values.len() as f64;
+                    let stddev = (study
+                        .best_values
+                        .values()
+                        .map(|vs| (vs[i].expect("unreachable") - mean).powi(2))
+                        .sum::<f64>()
+                        / study.best_values.len() as f64)
+                        .sqrt();
+                    study.best_values_avg.mean.push(Some(mean));
+                    study.best_values_avg.stddev.push(Some(stddev));
+                }
             }
         }
 
