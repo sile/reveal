@@ -1,6 +1,6 @@
 use crate::utils::MeanAndStddev;
 use hporecord::{Record, ValueDef};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 
@@ -155,10 +155,13 @@ impl CurveOpt {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Study {
-    span_name: String,
-    objective: ValueDef,
-    best_values_avg: MeanAndStddev<Vec<Option<f64>>>,
+    pub span_name: String,
+    pub objective: ValueDef,
+    pub best_values_avg: MeanAndStddev<Vec<Option<f64>>>,
+
+    // TODO: delete
+    #[serde(skip_serializing, default)]
     best_values: BTreeMap<String, Vec<Option<f64>>>,
 }
