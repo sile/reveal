@@ -77,6 +77,7 @@ impl CurveOpt {
                                 stddev: Vec::new(),
                             },
                             best_values: Default::default(),
+                            samples: 0,
                         })
                         .best_values
                         .insert(study.id.clone(), vec![None]);
@@ -119,6 +120,8 @@ impl CurveOpt {
 
         for studies in studies.values_mut() {
             for study in studies.values_mut() {
+                study.samples = study.best_values.len();
+
                 let size = study
                     .best_values
                     .values()
@@ -160,6 +163,7 @@ pub struct Study {
     pub span_name: String,
     pub objective: ValueDef,
     pub best_values_avg: MeanAndStddev<Vec<Option<f64>>>,
+    pub samples: usize,
 
     // TODO: delete
     #[serde(skip_serializing, default)]
