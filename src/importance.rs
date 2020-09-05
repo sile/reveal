@@ -1,6 +1,7 @@
 use anyhow::ensure;
 use hporecord::{EvalState, ParamDef, Record, StudyId, StudyRecord};
 //use indicatif::ProgressBar;
+use crate::utils::MeanAndStddev;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
@@ -160,10 +161,4 @@ impl Study {
 pub struct Importance {
     pub params: Vec<String>,
     pub importance: MeanAndStddev,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct MeanAndStddev {
-    pub mean: f64,
-    pub stddev: f64,
 }

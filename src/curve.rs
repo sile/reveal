@@ -1,3 +1,4 @@
+use crate::utils::MeanAndStddev;
 use hporecord::{Record, ValueDef};
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -60,6 +61,10 @@ impl CurveOpt {
                         .or_insert_with(|| Study {
                             span_name: study.spans[self.span_index].name.clone(),
                             objective: study.values[self.objective_index].clone(),
+                            best_values_avg: MeanAndStddev {
+                                mean: Vec::new(),
+                                stddev: Vec::new(),
+                            },
                             best_values: Default::default(),
                         })
                         .best_values
@@ -96,6 +101,38 @@ impl CurveOpt {
             }
         }
 
+        for study in studies.values_mut() {
+            let size = study
+                .best_values
+                .values()
+                .map(|vs| vs.len())
+                .max()
+                .expect("unreachable");
+            for i in 0..size {
+                if study.best_values.values().any(|vs| vs[i].is_none()) {
+                    study.best_values_avg.mean.push(None);
+                    study.best_values_avg.stddev.push(None);
+                    continue;
+                }
+
+                let total = study
+                    .best_values
+                    .values()
+                    .map(|vs| vs[i].expect("unreachable"))
+                    .sum::<f64>();
+                let mean = total / study.best_values.len() as f64;
+                let stddev = (study
+                    .best_values
+                    .values()
+                    .map(|vs| (vs[i].expect("unreachable") - mean).powi(2))
+                    .sum::<f64>()
+                    / study.best_values.len() as f64)
+                    .sqrt();
+                study.best_values_avg.mean.push(Some(mean));
+                study.best_values_avg.stddev.push(Some(stddev));
+            }
+        }
+
         Ok(studies)
     }
 }
@@ -104,5 +141,6 @@ impl CurveOpt {
 pub struct Study {
     span_name: String,
     objective: ValueDef,
+    best_values_avg: MeanAndStddev<Vec<Option<f64>>>,
     best_values: BTreeMap<String, Vec<Option<f64>>>,
 }
