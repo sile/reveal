@@ -1,3 +1,4 @@
+pub mod convert;
 pub mod curve;
 pub mod importance;
 pub mod io;

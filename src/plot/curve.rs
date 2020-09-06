@@ -171,8 +171,9 @@ impl PlotCurveOpt {
         let file = std::fs::File::create(dat_path)?;
         let mut w = std::io::BufWriter::new(file);
 
-        for optimizer in studies.keys() {
-            write!(w, "{:?} {:?} ", optimizer, optimizer)?;
+        for (optimizer, study) in studies {
+            let name = format!("{} (n={})", optimizer, study.samples);
+            write!(w, "{:?} {:?} ", name, name)?;
         }
         writeln!(w)?;
 

@@ -6,6 +6,7 @@ enum Opt {
     Importance(reveal::importance::ImportanceOpt),
     Curve(reveal::curve::CurveOpt),
     Plot(reveal::plot::PlotOpt),
+    Convert(reveal::convert::ConvertOpt),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -27,6 +28,11 @@ fn main() -> anyhow::Result<()> {
         }
         Opt::Plot(opt) => {
             opt.plot(std::io::stdin().lock())?;
+        }
+        Opt::Convert(opt) => {
+            let records = reveal::io::read_records(std::io::stdin().lock())
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            opt.convert(&records)?;
         }
     }
     Ok(())

@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+csv = "1"
 fanova = "0.1"
 hporecord = { path = "../hporecord/" } #"0.0.1"
 indicatif = "0.15"
