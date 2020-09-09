@@ -1,7 +1,7 @@
 use crate::utils::MeanAndStddev;
 use hporecord::{Record, ValueDef};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use structopt::StructOpt;
 
 pub type LuaScript = String;
@@ -60,6 +60,7 @@ impl CurveOpt {
         }
 
         let mut studies: Studies = BTreeMap::new();
+        let mut skipped_studies = BTreeSet::new();
         for record in records {
             match record {
                 Record::Study(study) => {
@@ -86,6 +87,14 @@ impl CurveOpt {
                     if !eval.state.is_complete() {
                         continue;
                     }
+                    if !problem_mapping.contains_key(&eval.study) {
+                        if !skipped_studies.contains(&eval.study) {
+                            eprintln!("[WARN] Unknown study: {:?}", eval.study);
+                            skipped_studies.insert(&eval.study);
+                        }
+                        continue;
+                    }
+
                     let problem_id = problem_mapping.get(&eval.study).expect("TODO");
                     let optimizer_id = optimizer_mapping.get(&eval.study).expect("TODO");
 
@@ -126,7 +135,7 @@ impl CurveOpt {
                     .best_values
                     .values()
                     .map(|vs| vs.len())
-                    .max()
+                    .min()
                     .expect("unreachable");
                 for i in 0..size {
                     if study.best_values.values().any(|vs| vs[i].is_none()) {

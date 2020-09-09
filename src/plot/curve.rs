@@ -210,12 +210,12 @@ impl PlotCurveOpt {
             let max_step = x_len(studies) - 1;
             let step = max_step / 5;
 
-            if let Some(y) = studies
-                .values()
-                .filter_map(|s| s.best_values_avg.mean[step].map(OrderedFloat))
-                .max()
-            {
-                let ymax = y.0.to_string();
+            if let Some(y) = mean(
+                studies
+                    .values()
+                    .filter_map(|s| s.best_values_avg.mean[step]),
+            ) {
+                let ymax = y.to_string();
                 if ymax == self.ymin(studies) {
                     "".to_string()
                 } else {
@@ -224,6 +224,8 @@ impl PlotCurveOpt {
             } else {
                 "".to_string()
             }
+        } else if !self.errorbar {
+            "".to_string()
         } else {
             let i = x_len(studies) - 1;
             let j = i / 5;
@@ -258,6 +260,10 @@ impl PlotCurveOpt {
         if let Some(y) = self.ymin {
             y.to_string()
         } else if is_minimize {
+            if !self.errorbar {
+                return "".to_string();
+            }
+
             let i = x_len(studies) - 1;
             let j = i / 5;
 
@@ -281,12 +287,12 @@ impl PlotCurveOpt {
             let max_step = x_len(studies) - 1;
             let step = max_step / 5;
 
-            if let Some(y) = studies
-                .values()
-                .filter_map(|s| s.best_values_avg.mean[step].map(OrderedFloat))
-                .min()
-            {
-                let ymin = y.0.to_string();
+            if let Some(y) = mean(
+                studies
+                    .values()
+                    .filter_map(|s| s.best_values_avg.mean[step]),
+            ) {
+                let ymin = y.to_string();
                 if ymin == self.ymax(studies) {
                     "".to_string()
                 } else {
@@ -317,4 +323,18 @@ fn x_len(studies: &BTreeMap<String, Study>) -> usize {
         .map(|study| study.best_values_avg.mean.len())
         .min()
         .expect("unreachable")
+}
+
+fn mean(xs: impl Iterator<Item = f64>) -> Option<f64> {
+    let mut v = 0.0;
+    let mut n = 0;
+    for x in xs {
+        v += x;
+        n += 1;
+    }
+    if n == 0 {
+        None
+    } else {
+        Some(v / n as f64)
+    }
 }
