@@ -4,6 +4,7 @@ use hporecord::{EvalState, ParamDef, Record, StudyId, StudyRecord};
 use crate::utils::MeanAndStddev;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
@@ -19,6 +20,9 @@ pub struct ImportanceOpt {
 
     #[structopt(long, default_value = "1")]
     pub max_dimension: NonZeroUsize,
+
+    #[structopt(long, default_value = "1000")]
+    pub max_samples: NonZeroUsize,
 
     #[structopt(long)]
     pub convert_log_param: bool,
@@ -136,6 +140,25 @@ impl ImportanceOpt {
                 }
             }
         }
+
+        for study in studies.values_mut() {
+            if self.max_samples.get() < study.values.len() {
+                let mut indices = (0..study.values.len()).collect::<Vec<_>>();
+                indices.shuffle(&mut rand::thread_rng());
+                let mut params =
+                    vec![Vec::with_capacity(self.max_samples.get()); study.params.len()];
+                let mut values = Vec::with_capacity(self.max_samples.get());
+                for &i in &indices[0..self.max_samples.get()] {
+                    for j in 0..study.params.len() {
+                        params[j].push(study.params[j][i]);
+                    }
+                    values.push(study.values[i]);
+                }
+                study.params = params;
+                study.values = values;
+            }
+        }
+
         Ok(studies)
     }
 }

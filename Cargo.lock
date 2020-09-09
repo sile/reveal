@@ -473,6 +473,7 @@ dependencies = [
  "indicatif",
  "itertools",
  "ordered-float",
+ "rand",
  "rlua",
  "serde",
  "serde_json",
