@@ -144,11 +144,12 @@ impl ImportanceOpt {
         for study in studies.values_mut() {
             if self.max_samples.get() < study.values.len() {
                 let mut indices = (0..study.values.len()).collect::<Vec<_>>();
-                indices.shuffle(&mut rand::thread_rng());
+                let (shuffled_indices, _) =
+                    indices.partial_shuffle(&mut rand::thread_rng(), self.max_samples.get());
                 let mut params =
                     vec![Vec::with_capacity(self.max_samples.get()); study.params.len()];
                 let mut values = Vec::with_capacity(self.max_samples.get());
-                for &i in &indices[0..self.max_samples.get()] {
+                for &mut i in shuffled_indices {
                     for j in 0..study.params.len() {
                         params[j].push(study.params[j][i]);
                     }
